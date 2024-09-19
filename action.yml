@@ -1,0 +1,15 @@
+name: 'PullRequest review labeler'
+description: 'Set labels when members from specific team approving PR'
+inputs:
+  github-token:
+    description: 'Github token with Org teams read permitting'
+    required: true
+  rules:
+    description: 'Mapping between team name and label name'
+    required: true
+runs:
+  using: "docker"
+  image: "Dockerfile"
+  env:
+    RULES: ${{inputs.rules}}
+    GITHUB_TOKEN: ${{ inputs.github-token }}
