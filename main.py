@@ -21,8 +21,8 @@ def get_from_env(var_name):
     return value
 
 
-def initLabelMapping(org, rules):
-    print("Rules:")
+def initRoleLabelMapping(org, rules):
+    print("Loaded rules:")
     result = []
     for team_name, label in rules:
         print(f"\tteam_name: {team_name}, label: {label}")
@@ -44,7 +44,8 @@ def is_reviewer_waiting(reviews: list[PullRequestReview]):
     return approved_index < changes_requested_index
 
 
-def processLabelMapping(label_mapping: LabelMapping, pull_request):
+def processLabelMapping(role: LabelMapping, pull_request):
+    print(f"===== Processing labels for role: {role} =====")
     pr_labels = list(pull_request.get_labels())
     print(f"Current PR labels: {pr_labels}")
 
@@ -53,40 +54,42 @@ def processLabelMapping(label_mapping: LabelMapping, pull_request):
     print(f"requesters review requests: {list(requesters)}")
     print(f"team review requests (NOT USING): {list(team)}")
     for requester in requesters:
-        if requester in label_mapping.team_members:
+        if requester in role.team_members:
             for label in pr_labels:
-                if label.name == label_mapping.label_name:
-                    pull_request.remove_from_labels(label_mapping.label_name)
+                if label.name == role.label_name:
+                    print(f"Removing {role.label_name} label")
+                    pull_request.remove_from_labels(role.label_name)
                     return
 
-    # If there are no requests for a review, but there is no any review -> do nothing
+    # Grouping reviews by author
     reviews = list(pull_request.get_reviews())
-    print(f"Reviews list: {reviews}")
-    if not reviews:
-        return  # no reviews
+    print(f"All reviews list: {reviews}")
+    reviews_by_author = defaultdict(list)
+    for rev in reviews:
+        if rev.user in role.team_members:
+            reviews_by_author[rev.user.login].append(rev)
+    # If there are no requests for a review, but there is no any review -> do nothing
+    print(f"Reviews for {role.team_members} team grouped by author: {reviews_by_author}")
+    if not reviews_by_author:
+        return  # no reviews to current role
 
     # If among those who made at least one review, the last review is not APPROVED -> do not put a label
     approve = True
-    # Grouping reviews by author
-    reviews_by_author = defaultdict(list)
-    for rev in reviews:
-        if rev.user in label_mapping.team_members:
-            reviews_by_author[rev.user.login].append(rev)
     # For each author in reviews activity
-    for author, value in reviews_by_author.items():
+    for author, reviews in reviews_by_author.items():
         print(f"Reviews from: {author}")
-        if is_reviewer_waiting(value):
+        if is_reviewer_waiting(reviews) or any(author == requester.login for requester in requesters):
             approve = False
             print("\t reject")
         else:
             print("\t approve")
     print(f"Final PR approve: {approve}")
     if approve:
-        pull_request.add_to_labels(label_mapping.label_name)
+        pull_request.add_to_labels(role.label_name)
     else:
         for label in pr_labels:
-            if label.name == label_mapping.label_name:
-                pull_request.remove_from_labels(label_mapping.label_name)
+            if label.name == role.label_name:
+                pull_request.remove_from_labels(role.label_name)
 
 
 if __name__ == '__main__':
@@ -106,9 +109,9 @@ if __name__ == '__main__':
 
         # Getting the members of all the specified groups
         label_rules = json.loads(get_from_env("RULES"))
-        labelMapping = initLabelMapping(github_org, label_rules)
-        print(f"labelMapping: {labelMapping}")
+        roles = initRoleLabelMapping(github_org, label_rules)
+        print(f"Roles: {roles}")
 
         pull_request = repo.get_pull(github_event['pull_request']['number'])
-        for label in labelMapping:
-            processLabelMapping(label, pull_request)
+        for role in roles:
+            processLabelMapping(role, pull_request)
