@@ -22,6 +22,9 @@ A list of pairs that determines for which team which label should be hanged in t
 [["team1", "labelname1"], ["team2", "labelname2"]]
 ```
 
+> [!IMPORTANT]  
+> Ensure the labels you specified exist in the repository
+
 ## Usage example
 ```yaml
 name: Approve labeler
