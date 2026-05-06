@@ -26,6 +26,8 @@ A list of pairs that determines for which team which label should be hanged in t
 > Ensure the labels you specified exist in the repository
 
 ## Usage example
+Add, for example, `.github/workflows/labeler.yml` file:
+
 ```yaml
 name: Approve labeler
 on:
